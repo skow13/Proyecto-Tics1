@@ -23,19 +23,20 @@ MQTT_PASS   = os.getenv("MQTT_PASS")
 def get_connection():
     return psycopg2.connect(**DB_CONFIG)
 
-def registrar_medida(mac, temperatura, humedad, modo):
+def registrar_medida(mac, temperatura, humedad, modo, bateria_pct):
     try:
         conn = get_connection()
         cur  = conn.cursor()
         cur.execute(
-            "SELECT * FROM registrar_medida(%s, %s, %s, %s)",
-            (mac, temperatura, humedad, modo)
+            "SELECT * FROM registrar_medida(%s, %s, %s, %s, %s)",
+            (mac, temperatura, humedad, modo, bateria_pct)
         )
         resultado = cur.fetchone()
         conn.commit()
         cur.close()
         conn.close()
-        print(f"Medida guardada -> ID: {resultado[0]} | {temperatura}C | {humedad}%")
+        bat_str = f"{bateria_pct}%" if bateria_pct is not None else "N/A"
+        print(f"Medida guardada -> ID: {resultado[0]} | {temperatura}C | {humedad}% | Bat: {bat_str}")
     except psycopg2.Error as e:
         print(f"Error DB: {e}")
 
@@ -57,12 +58,13 @@ def on_message(client, userdata, msg):
         temperatura = payload.get("temperatura")
         humedad     = payload.get("humedad")
         modo        = payload.get("modo", "wifi")
+        bateria_pct = payload.get("bateria_pct") 
 
         if not all([mac, temperatura, humedad]):
             print("Payload incompleto, se descarta.")
             return
 
-        registrar_medida(mac, temperatura, humedad, modo)
+        registrar_medida(mac, temperatura, humedad, modo, bateria_pct)
 
     except json.JSONDecodeError:
         print(f"Mensaje no es JSON valido: {msg.payload}")
